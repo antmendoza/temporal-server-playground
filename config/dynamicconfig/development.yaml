@@ -1,0 +1,10 @@
+# Base dynamic config — switch scenarios via: make scenario-<name>
+# The server watches this file and reloads on change — no restart needed.
+
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true # Dev only — do not use in production
+    constraints: {}
