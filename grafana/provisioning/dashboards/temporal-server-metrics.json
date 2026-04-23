@@ -22,7 +22,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 2789770949836800,
   "iteration": 1642627344913,
   "links": [],
   "liveNow": false,
@@ -3241,6 +3241,7 @@
   },
   "timezone": "",
   "title": "Temporal Server Metrics",
+  "uid": "dfa72564-d428-4096-8226-f83699053e33",
   "version": 1,
   "weekStart": ""
 }

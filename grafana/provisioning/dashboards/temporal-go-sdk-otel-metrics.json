@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 2,
+  "id": 2789770664624128,
   "links": [],
   "panels": [
     {
@@ -3565,7 +3565,7 @@
   "timepicker": {},
   "timezone": "utc",
   "title": "Temporal Go SDK (OTel) Metrics",
-  "uid": "",
-  "version": 2,
+  "uid": "96babeb1-3e0b-4212-b3ef-1ba4feb0a4f2",
+  "version": 1,
   "weekStart": ""
 }

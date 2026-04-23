@@ -1,5 +1,5 @@
 .PHONY: up down restart logs reset \
-        scenario-visibility scenario-matching scenario-history scenario-frontend \
+        scenario-shard-contention \
         tidy worker starter
 
 DYNCONFIG = config/dynamicconfig/development.yaml
@@ -8,6 +8,7 @@ SCENARIOS = config/dynamicconfig/scenarios
 # ── Cluster lifecycle ──────────────────────────────────────────────────────────
 
 up:
+	make down
 	docker compose up -d
 
 down:
@@ -24,21 +25,15 @@ reset:
 	cp $(SCENARIOS)/base.yaml $(DYNCONFIG)
 	@echo "→ reset to base (all defaults)"
 
-scenario-visibility:
-	cp $(SCENARIOS)/visibility-backlog.yaml $(DYNCONFIG)
-	@echo "→ visibility backlog: write QPS capped at 5"
+# ── Scenarios ─────────────────────────────────────────────────────────────────
+# restart needed.
+shards ?= 4
 
-scenario-matching:
-	cp $(SCENARIOS)/matching-backlog.yaml $(DYNCONFIG)
-	@echo "→ matching backlog: 1 partition, low persistence QPS"
-
-scenario-history:
-	cp $(SCENARIOS)/history-shard-contention.yaml $(DYNCONFIG)
-	@echo "→ history shard contention: persistence QPS capped at 20"
-
-scenario-frontend:
-	cp $(SCENARIOS)/frontend-rate-limit.yaml $(DYNCONFIG)
-	@echo "→ frontend rate limit: visibility API capped at 1 RPS per namespace"
+scenario-shard-contention:
+	@echo "→ shard contention: reinitializing cluster with NUM_HISTORY_SHARDS=$(shards)"
+	make down
+	make reset
+	NUM_HISTORY_SHARDS=$(shards) make up
 
 # ── Load generator ────────────────────────────────────────────────────────────
 
@@ -49,4 +44,4 @@ worker:
 	cd loadgen && go run ./worker
 
 starter:
-	cd loadgen && go run ./starter -workflows=$(w) -activities=$(a) -children=$(c) -interval=$(interval)
+	cd loadgen && go run ./starter -workflows=$(w) -activities=$(a) -children=$(c) -interval=$(interval) -iterations=$(iterations)
