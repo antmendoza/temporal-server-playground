@@ -49,4 +49,4 @@ worker:
 	cd loadgen && go run ./worker
 
 starter:
-	cd loadgen && go run ./starter -workflows=$(w) -activities=$(a) -children=$(c)
+	cd loadgen && go run ./starter -workflows=$(w) -activities=$(a) -children=$(c) -interval=$(interval)
