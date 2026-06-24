@@ -18,7 +18,12 @@ func main() {
 	}
 	defer c.Close()
 
-	w := worker.New(c, loadgen.TaskQueue, worker.Options{})
+	w := worker.New(c, loadgen.TaskQueue, worker.Options{
+		MaxConcurrentWorkflowTaskPollers:       1000,
+		MaxConcurrentActivityTaskPollers:       1000,
+		MaxConcurrentActivityExecutionSize:     1000,
+		MaxConcurrentWorkflowTaskExecutionSize: 1000,
+	})
 	w.RegisterWorkflow(loadgen.ParentWorkflow)
 	w.RegisterWorkflow(loadgen.ChildWorkflow)
 	w.RegisterActivity(loadgen.SimpleActivity)

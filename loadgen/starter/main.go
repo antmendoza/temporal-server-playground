@@ -14,10 +14,11 @@ import (
 )
 
 func main() {
-	workflows  := flag.Int("workflows", 10, "number of workflows to start")
+	workflows := flag.Int("workflows", 10, "number of workflows to start")
 	activities := flag.Int("activities", 3, "number of concurrent activities per workflow")
-	children   := flag.Int("children", 3, "number of concurrent child workflows per workflow")
-	intervalMs := flag.Int("interval", 0, "ms between each workflow start (0 = start all concurrently)")
+	children := flag.Int("children", 3, "number of concurrent child workflows per workflow")
+	iterations := flag.Int("iterations", 1, "number of iterations per workflow")
+	intervalMs := flag.Int("intervalMs", 0, "ms between each workflow start (0 = start all concurrently)")
 	flag.Parse()
 
 	c, err := client.Dial(client.Options{
@@ -31,6 +32,7 @@ func main() {
 	params := loadgen.Params{
 		NumActivities:     *activities,
 		NumChildWorkflows: *children,
+		Iterations:        *iterations,
 	}
 
 	start := func(i int) {
@@ -71,4 +73,7 @@ func main() {
 
 	fmt.Printf("started %d workflows (%d activities + %d child workflows each)\n",
 		*workflows, *activities, *children)
+
+	//wait 10 seconds to allow the MetricsHandler publishing metrics
+	<-time.After(10 * time.Second)
 }

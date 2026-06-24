@@ -88,6 +88,7 @@ services:
       - BIND_ON_IP=0.0.0.0
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
       - PROMETHEUS_ENDPOINT=0.0.0.0:9090
+      - NUM_HISTORY_SHARDS=${NUM_HISTORY_SHARDS:-512}
     ports:
       - "7233:7233"
       - "9090:9090"  # prometheus metrics

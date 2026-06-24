@@ -22,7 +22,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 273753667690496,
   "links": [],
   "panels": [
     {
@@ -5331,6 +5331,6 @@
   },
   "timezone": "",
   "title": "[Custom/Modified]Temporal Server Metrics",
-  "uid": "FxWwuPinz",
-  "version": 11
+  "uid": "custom-modified-temporal-server-metrics",
+  "version": 2
 }

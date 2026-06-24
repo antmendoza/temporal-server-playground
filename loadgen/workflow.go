@@ -11,6 +11,7 @@ const TaskQueue = "load-gen"
 type Params struct {
 	NumActivities     int
 	NumChildWorkflows int
+	Iterations        int
 }
 
 func ParentWorkflow(ctx workflow.Context, p Params) error {
@@ -19,31 +20,36 @@ func ParentWorkflow(ctx workflow.Context, p Params) error {
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
-	// Start activities concurrently
-	actFutures := make([]workflow.Future, p.NumActivities)
-	for i := 0; i < p.NumActivities; i++ {
-		actFutures[i] = workflow.ExecuteActivity(ctx, SimpleActivity)
-	}
+	for i := 0; i < p.Iterations; i++ {
 
-	// Start child workflows concurrently
-	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{})
-	childFutures := make([]workflow.Future, p.NumChildWorkflows)
-	for i := 0; i < p.NumChildWorkflows; i++ {
-		childFutures[i] = workflow.ExecuteChildWorkflow(childCtx, ChildWorkflow)
-	}
-
-	// Wait for all
-	for _, f := range actFutures {
-		if err := f.Get(ctx, nil); err != nil {
-			return err
+		// Start activities concurrently
+		actFutures := make([]workflow.Future, p.NumActivities)
+		for i := 0; i < p.NumActivities; i++ {
+			actFutures[i] = workflow.ExecuteActivity(ctx, SimpleActivity)
 		}
-	}
-	for _, f := range childFutures {
-		if err := f.Get(ctx, nil); err != nil {
-			return err
-		}
-	}
 
+		// Start child workflows concurrently
+		childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{})
+		childFutures := make([]workflow.Future, p.NumChildWorkflows)
+		for i := 0; i < p.NumChildWorkflows; i++ {
+			childFutures[i] = workflow.ExecuteChildWorkflow(childCtx, ChildWorkflow)
+		}
+
+		// Wait for all
+		for _, f := range actFutures {
+			if err := f.Get(ctx, nil); err != nil {
+				return err
+			}
+		}
+		for _, f := range childFutures {
+			if err := f.Get(ctx, nil); err != nil {
+				return err
+			}
+		}
+
+		workflow.Sleep(ctx, 1*time.Second)
+
+	}
 	return nil
 }
 

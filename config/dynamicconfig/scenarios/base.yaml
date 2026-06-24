@@ -1,5 +1,4 @@
 # Base dynamic config — switch scenarios via: make scenario-<name>
-# The server watches this file and reloads on change — no restart needed.
 
 limit.maxIDLength:
   - value: 255

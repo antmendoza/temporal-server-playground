@@ -2,10 +2,12 @@ package loadgen
 
 import (
 	"context"
+	"math/rand"
 	"time"
 )
 
 func SimpleActivity(ctx context.Context) error {
-	time.Sleep(200 * time.Millisecond)
+	randomSleep := time.Duration(rand.Intn(500)+500) * time.Millisecond
+	time.Sleep(randomSleep)
 	return nil
 }
