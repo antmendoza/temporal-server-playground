@@ -1,0 +1,12 @@
+# Environment-agnostic Temporal settings; persistence endpoints live in temporal-<env>.yaml
+server:
+  config:
+    namespaces:
+      create: true
+      namespace:
+        - name: default
+          retention: 1d
+admintools:
+  enabled: true
+web:
+  enabled: true

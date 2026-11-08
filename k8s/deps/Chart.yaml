@@ -1,0 +1,5 @@
+apiVersion: v2
+name: playground-deps
+description: In-cluster PostgreSQL and Elasticsearch for local runs; on AWS these are RDS/OpenSearch instead
+type: application
+version: 0.1.0

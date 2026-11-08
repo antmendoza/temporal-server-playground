@@ -1,0 +1,44 @@
+# Throttling lab — see scenarios/001-throttling/README.md for the full walkthrough.
+#
+# Starts at baseline (no knob active). For each exercise, uncomment ONE block below in
+# config/dynamicconfig/development.yaml, run `make dynconfig`, wait ~2 min, then comment it out again.
+
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true # Dev only — do not use in production
+    constraints: {}
+
+# ── Exercise 1: frontend namespace RPS (default 2400) ────────────────────────────
+# Signal: service_errors_resource_exhausted{service_name="frontend", resource_exhausted_cause="RpsLimit"}
+#   mostly on PollWorkflowExecutionHistory (the load client waiting for results); poll APIs wait
+#   for a token before failing. Throughput 20 → ~10/s, schedule-to-start p95 → ~10s.
+#frontend.namespaceRPS:
+#  - value: 50
+#    constraints: {}
+
+# ── Exercise 2: frontend concurrent long-polls (default 1200) ────────────────────
+# Signal: service_errors_resource_exhausted{service_name="frontend", resource_exhausted_cause="ConcurrentLimit"}
+#   on PollWorkflowTaskQueue / PollActivityTaskQueue — and NO slowdown: the worker has more pollers
+#   than it needs. Errors are not always impact.
+#frontend.namespaceCount:
+#  - value: 20
+#    constraints: {}
+
+# ── Exercise 3: history persistence QPS (default 9000) ───────────────────────────
+# Signal: persistence_errors_resource_exhausted{service_name="history"}; the PersistenceLimit cause
+#   also shows downstream in matching (AddWorkflowTask, PollWorkflowTaskQueue). Frontend clean.
+#   Throughput 20 → ~3/s, schedule-to-start p95 → ~10s.
+#history.persistenceMaxQPS:
+#  - value: 200
+#    constraints: {}
+
+# ── Exercise 4: frontend persistence QPS (default 2000) — revert promptly ────────
+# Signal: persistence_errors_resource_exhausted{service_name="frontend"} (GetNamespace,
+#   GetCurrentClusterMetadata); every StartWorkflowExecution fails with PersistenceLimit.
+#   Throughput → 0. Also throttles the frontend's membership heartbeat (UpsertClusterMembership).
+#frontend.persistenceMaxQPS:
+#  - value: 10
+#    constraints: {}

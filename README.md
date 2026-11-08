@@ -1,103 +1,124 @@
 # temporal-server-playground
 
-Local Temporal environment for learning internals through degradation scenarios. 
-Uses dynamic config to induce specific failure modes and observe them in Prometheus/Grafana.
-
+A local Temporal cluster for learning server internals through degradation scenarios. Each scenario
+changes the server's dynamic config to induce a specific failure mode, a load generator drives
+traffic, and you observe the effect in Grafana.
 
 ## Stack
 
-| Service | URL |
+Runs on a local minikube cluster (profile and kube context `playground`, namespace `playground`),
+installed with Helm: the official `temporalio/temporal` chart (frontend, history, matching and worker
+as separate pods), PostgreSQL + Elasticsearch from the local `k8s/deps` chart, Prometheus and Grafana
+from their community charts. Every `make` command passes `--kube-context playground` explicitly.
+
+| Service | URL (via `make forward`) |
 |---|---|
 | Temporal UI | http://localhost:8080 |
 | Grafana | http://localhost:3000 |
 | Prometheus | http://localhost:9091 |
 | Temporal gRPC | localhost:7233 |
-| Elasticsearch | http://localhost:9200 |
 
-## Getting Started
+## Getting started
+
+Needs Docker Desktop, `minikube`, `kubectl`, `helm` and Go. Clone with the omes submodule:
 
 ```bash
-make up       # start everything
+git clone --recursive git@github.com:antmendoza/temporal-server-playground.git
 ```
+
 ```bash
-make logs     # follow Temporal server logs
+
+minikube delete -p playground
+make cluster  # once: create the minikube cluster
+make up       # install everything into a fresh namespace (first run pulls images, ~5 min)
 ```
+
+Then keep these two running, each in its own terminal, for as long as you use the playground:
+
 ```bash
-make down     # stop everything
+make forward  # port-forwards above; reconnect on their own across reinstalls
+```
+
+```bash
+make worker   # omes Go worker; survives reinstalls and reconnects
+```
+
+Other commands:
+
+```bash
+make logs        # follow Temporal server logs
+make down        # delete the namespace (Temporal, DBs, Prometheus, Grafana)
+make dashboards  # reload grafana/dashboards/*.json into the running Grafana. Use this to reload the dashboards after changing them manually.
 ```
 
 ## Scenarios
 
-Each scenario modifies `config/dynamicconfig/development.yaml` and destroy and start the environment
-(Changing dynamic config does not require server reload, reload is performed to start with a clean environment)
+Each scenario lives in `scenarios/<name>/`: a `README.md` with the walkthrough and a
+`dynamicconfig.yaml`. Start one with:
 
-
-### Frontend rate limit (WIP)
 ```bash
-make scenario-frontend-rate-limit-001
+make scenario-<name>     # e.g. make scenario-001-throttling
 ```
 
+This copies the scenario's config to `config/dynamicconfig/development.yaml`, deletes the
+`playground` namespace and reinstalls everything, so every run starts clean: no workflows, no
+metrics, config in place before the server boots. `make reset` does the same with the baseline.
 
-### shard contention (WIP)
-```bash
-make scenario-shard-contention shards=2
-```
+Some scenarios have exercises you apply on a running cluster: edit
+`config/dynamicconfig/development.yaml`, then `make dynconfig` (no reinstall; takes ~1–2 min to apply).
 
+Each exercise changes one knob and names the signal you should see.
+Status: ✅ verified on Kubernetes, 🚧 WIP, 📋 planned.
 
-### reset to defaults
-```bash
-make reset                 # back to defaults
-```
-
-
+| Scenario | Status | What it teaches |
+|---|---|---|
+| [000-base](scenarios/000-base/README.md) | ✅ | What healthy looks like — run it first |
+| [001-throttling](scenarios/001-throttling/README.md) | ✅ | Four limits behind one `RESOURCE_EXHAUSTED`: `RpsLimit`, `ConcurrentLimit`, `PersistenceLimit` on frontend and history, told apart by cause and service |
+| [002-history-queues](scenarios/002-history-queues/README.md) | ✅ | Which History queue is behind — transfer, timer or visibility — from queue latency vs. schedule latency |
+| [003-shard-contention](scenarios/003-shard-contention/README.md) | 🚧 | Too few history shards: workflows queue for the same shard's I/O slot (not yet re-verified on Kubernetes) |
+| matching-backlog | 📋 | `matching.numTaskqueueReadPartitions=1` + low `matching.rps` → `approximate_backlog_count` grows |
+| shard-handoff | 📋 | Scale History to 2–3 pods and delete one under load → `ShardOwnershipLost`, `sharditem_acquisition_latency`; then `history.shardLingerTimeLimit` |
+| size-limits | 📋 | Low `limit.historyCount.error` → workflows terminated with nobody asking; Continue-as-New |
+| hot-workflow | 📋 | Signal fan-in to one execution → `BusyWorkflow`; then `history.taskSchedulerEnableExecutionQueueScheduler` |
+| history-cache-pressure | 📋 | tiny `history.hostLevelCacheMaxSize` → cache misses, more `GetWorkflowExecution` reads, history latency up |
 
 ## Load generation
 
+Load comes from [omes](https://github.com/temporalio/omes), included as a git submodule in `omes/`
+and pinned to a tested commit (`make worker` / `make load` fetch it if it's missing). To move to a
+newer omes: `git -C omes pull`, test, then commit the new pin. The worker and the load are separate
+so the worker survives a reinstall; they are paired by `run` (task queue `omes-<run>`).
 
 ```bash
-make tidy #compile go code
+# iterations=total, or duration=e.g. 30m for steady load; concurrent=max in flight;
+# rps=max iterations started per second (0 = unlimited); scenario=omes scenario; opts=extra omes flags
+make load iterations=300 concurrent=30
+make load duration=30m rps=20 concurrent=200
+make load scenario=throughput_stress concurrent=100 rps=50 opts="--option nexus-enabled=false"
 ```
 
-```bash
-make worker #start worker
-```
+`make load` keeps going when iterations fail, since degrading the server is the point.
+`cd omes && go run ./cmd/omes list-scenarios` lists the omes scenarios.
+Prometheus scrapes the worker (:9095) and the load client (:9096) as job `temporal-sdk`.
 
-```bash
-# w=workflows, a=activities per workflow, 
-# c=child workflows per workflow, intervalMs=time between workflow executions (0 = concurrent executions)
-# iterations=number of iterations, each iteration start a activities c child workflows
-#make starter w=1000 a=3 c=3 interval=0 iterations=100
-make starter w=100 a=5 c=3 intervalMs=100 iterations=5
-```
+## Other environments
 
+Environment-specific settings live in `k8s/values/temporal-<ENV>.yaml` (`ENV=minikube` by default),
+so another cluster means a new values file plus `CTX=<kube context>`.
 
-### Scenario catalog
-
-Each scenario isolates one component with a single dynamic-config knob, so the
-failure signal in Grafana is unambiguous. Status: ✅ implemented, 🚧 WIP, 📋 planned.
-
-| # | Scenario | Status | Knob | What you'd see |
-|---|---|---|---|---|
-| 1 | **frontend-rate-limit** | 🚧 | `frontend.namespaceRPS` very low | `RESOURCE_EXHAUSTED` on low-priority RPCs first (PollWorkflowTask, PollActivityTask — see [frontend quotas](https://github.com/temporalio/temporal/blob/main/service/frontend/configs/quotas.go)); `schedule_to_start` latency climbs |
-| 2 | **history-shard-contention** | ✅ | `history.shardIOConcurrency=1` + `NUM_HISTORY_SHARDS=2` | shard I/O semaphore latency; persistence p99 climbs on hot shards |
-| 3 | **matching-backlog** | 📋 | `matching.numTaskqueueReadPartitions=1` + low `matching.rps` | `approximate_backlog_count` grows; `schedule_to_start` p99 on task queues |
-| 4 | **visibility-backlog** | 📋 | `history.visibilityProcessorSchedulerWorkerCount=1` + low `history.visibilityProcessorMaxPollRPS` | visibility queue lag; search-attribute updates stale; list queries slow |
-| 5 | **history-cache-pressure** | 📋 | tiny `history.hostLevelCacheMaxSize` (e.g. 16) | cache miss rate ↑; `GetWorkflowExecution` reads ↑; history latency ↑ |
-| 6 | **persistence-overload** | 📋 | low `history.persistenceMaxQPS` (e.g. 50) | persistence throttling; `RESOURCE_EXHAUSTED_CAUSE_SYSTEM_OVERLOADED`; queue lag |
-
-## Project Structure
+## Project structure
 
 ```
-├── docker-compose.yml
 ├── Makefile
-├── config/
-│   └── dynamicconfig/
-│       ├── development.yaml          ← server reads this file
-│       └── scenarios/                ← copy one to development.yaml via make
-├── prometheus/
-│   └── prometheus.yml
-└── grafana/
-    └── provisioning/
-        ├── datasources/
-        └── dashboards/
+├── scenarios/<name>/
+│   ├── README.md                 ← walkthrough: setup, expected signals, questions
+│   └── dynamicconfig.yaml        ← copied to config/dynamicconfig/development.yaml by make
+├── config/dynamicconfig/
+│   └── development.yaml          ← the live config; edit it for exercises, then make dynconfig
+├── k8s/
+│   ├── deps/                     ← local chart: PostgreSQL + Elasticsearch (minikube only)
+│   └── values/                   ← Helm values: temporal(-<env>), prometheus, grafana
+├── grafana/dashboards/           ← loaded into Grafana as a ConfigMap
+├── omes/                         ← load generator (git submodule, pinned)
+└── scripts/port-forward.sh
 ```

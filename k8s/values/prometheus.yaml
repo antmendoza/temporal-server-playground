@@ -1,0 +1,54 @@
+alertmanager:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+# The reloader image has no arm64 build; config never changes in place (every scenario reinstalls)
+configmapReload:
+  prometheus:
+    enabled: false
+
+server:
+  persistentVolume:
+    enabled: false
+  retention: 1d
+  global:
+    scrape_interval: 15s
+
+# Drop the chart's default kubernetes-* jobs: they scrape the Temporal pods again and double-count server metrics
+scrapeConfigs: null
+
+serverFiles:
+  prometheus.yml:
+    scrape_configs:
+      - job_name: temporal-server
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              own_namespace: true
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name, __meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            regex: temporal;true
+            action: keep
+          - source_labels: [__address__]
+            regex: "([^:]+)(?::\\d+)?"
+            replacement: "${1}:9090"
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_component]
+            target_label: component
+
+      # omes runs on the host: worker on :9095, scenario client on :9096
+      - job_name: temporal-sdk
+        static_configs:
+          - targets: ["host.minikube.internal:9095", "host.minikube.internal:9096"]
+        metric_relabel_configs:
+          # omes names timers without a unit; the dashboards expect the OTel-style _seconds suffix
+          - source_labels: [__name__]
+            regex: "(temporal_.+_latency)_(bucket|sum|count)"
+            target_label: __name__
+            replacement: "${1}_seconds_${2}"

@@ -1,0 +1,3 @@
+[submodule "omes"]
+	path = omes
+	url = https://github.com/temporalio/omes.git

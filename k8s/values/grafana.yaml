@@ -1,0 +1,32 @@
+adminPassword: admin
+grafana.ini:
+  auth.anonymous:
+    enabled: true
+    org_role: Admin
+  auth:
+    disable_login_form: true
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server
+        isDefault: true
+        editable: true
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: temporal
+        type: file
+        disableDeletion: false
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/temporal
+
+# Created by `make up` from grafana/dashboards/*.json
+dashboardsConfigMaps:
+  temporal: grafana-dashboards

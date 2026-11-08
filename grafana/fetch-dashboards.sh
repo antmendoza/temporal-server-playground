@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-cd provisioning/dashboards
+cd dashboards
 
 host="http://localhost:3000"
 
