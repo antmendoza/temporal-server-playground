@@ -3,15 +3,49 @@
 No degradation: the server's defaults, plus two dev-only settings every scenario keeps. Run this
 before any scenario so you know what healthy looks like on the dashboards.
 
+Start the worker with 50 pollers, so it is never the bottleneck (the default, 2, is too few for
+this load):
+
+```bash
+cd ../..
+make worker pollers=50
+```
+
+Then reset the cluster and run the baseline load: each workflow runs 10 activities in parallel,
+each taking 0.2s. The scenarios use this same worker and load, so this is what they compare against.
+
 ```bash
 cd ../..
 make reset
-make load iterations=300 concurrent=30   # completes in ~5s
+make load scenario=serverless_burst duration=10m rps=25 concurrent=50 \
+  opts="--option fast-activity-count=0 --option slow-activity-count=10 --option slow-activity-duration=200ms"
 ```
 
-For a longer look, run steady load instead: `make load duration=10m rps=20 concurrent=200`.
-
 `make reset` is also how you return to a clean cluster after any scenario.
+
+## Baseline numbers
+
+Wait 2 minutes, then read the dashboards. Measured on minikube (6 CPUs, 10 GiB, server 1.32.2):
+
+| Signal | Baseline at `rps=25` |
+|---|---|
+| Workflows started / completed | ~25/s |
+| Activities executed | ~250/s |
+| `RESOURCE_EXHAUSTED` | none |
+| Activity schedule-to-start p50 / p95 / p99 | ~14 / 40 / 85 ms |
+| Workflow task schedule-to-start p50 / p95 / p99 | ~10 / 50 / 180 ms |
+| Workflow end-to-end p50 / p95 | ~0.38 / 0.49 s (the 10 activities run in parallel) |
+| Frontend requests | ~590/s |
+| Persistence QPS | history ~1,280, frontend ~76, matching ~2 |
+
+**`rps=25` is the highest rate this cluster handles without contention.** At 30 workflows/s,
+schedule-to-start starts to grow with no limit set: the server itself is saturated (history at
+~1,500 persistence calls/s on a single node). Above that, slowdowns you see come from the cluster,
+not from a scenario.
+
+**Your numbers may differ.** They depend on the laptop's CPU and on the resources given to Docker
+Desktop and minikube. If your baseline shows schedule-to-start growing or throttling at `rps=25`,
+lower `rps` until it is clean, and expect the scenario values to shift accordingly.
 
 ## Dashboards
 
@@ -34,7 +68,7 @@ happens.
 
 ## What to note down
 
-The scenario READMEs compare against these numbers, so it's worth reading them on your own cluster:
+The scenarios compare against these numbers, so it's worth reading them on your own cluster:
 
 - Service latencies (frontend, history, matching) and persistence latency by operation.
 - Persistence QPS per service, and the History queue latencies (transfer, timer, visibility).

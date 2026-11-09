@@ -40,8 +40,14 @@ make forward  # port-forwards above; reconnect on their own across reinstalls
 ```
 
 ```bash
-make worker   # omes Go worker; survives reinstalls and reconnects
+make worker pollers=50   # omes Go worker; survives reinstalls and reconnects
 ```
+
+`pollers=N` sets the worker's workflow-task and activity-task pollers (default 2). The scenarios
+use 50, which keeps the worker from being the bottleneck at their load; the values in the scenario
+READMEs were measured with it. Going much higher isn't useful: the worker and the load reach the
+cluster through `kubectl port-forward`, and hundreds of long polls through that tunnel may make it
+unreliable.
 
 Other commands:
 
