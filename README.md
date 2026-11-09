@@ -74,7 +74,7 @@ Status: ✅ verified on Kubernetes, 🚧 WIP, 📋 planned.
 |---|---|---|
 | [000-base](scenarios/000-base/README.md) | ✅ | What healthy looks like — run it first |
 | [001-throttling](scenarios/001-throttling/README.md) | ✅ | Four limits behind one `RESOURCE_EXHAUSTED`: `RpsLimit`, `ConcurrentLimit`, `PersistenceLimit` on frontend and history, told apart by cause and service |
-| [002-history-queues](scenarios/002-history-queues/README.md) | ✅ | Which History queue is behind — transfer, timer or visibility — from queue latency vs. schedule latency |
+| [002-history-queues](scenarios/002-history-queues/README.md) | 🚧 | Which History queue is behind — transfer, timer or visibility — from queue latency vs. schedule latency |
 | [003-shard-contention](scenarios/003-shard-contention/README.md) | 🚧 | Too few history shards: workflows queue for the same shard's I/O slot (not yet re-verified on Kubernetes) |
 | matching-backlog | 📋 | `matching.numTaskqueueReadPartitions=1` + low `matching.rps` → `approximate_backlog_count` grows |
 | shard-handoff | 📋 | Scale History to 2–3 pods and delete one under load → `ShardOwnershipLost`, `sharditem_acquisition_latency`; then `history.shardLingerTimeLimit` |

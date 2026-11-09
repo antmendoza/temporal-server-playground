@@ -1,4 +1,4 @@
-# Shard contention
+# WIP: Shard contention
 
 Every workflow lives on one history shard, picked by
 `farm.Fingerprint32(namespaceID + "_" + workflowID) % numShards`. With very few shards, many

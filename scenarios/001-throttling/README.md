@@ -22,6 +22,7 @@ make worker
 Then start the scenario and a steady load, and leave the load running for the whole lab:
 
 ```bash
+cd ../..
 make scenario-001-throttling
 make load duration=30m rps=20 concurrent=200
 ```
@@ -39,8 +40,16 @@ Wait 2 minutes and read the top row. At `rps=20` on minikube you should see roug
 
 ## How each exercise works
 
+
+While the load generator is running:
+
 1. Open `config/dynamicconfig/development.yaml` and uncomment **one** exercise block.
-2. Run `make dynconfig`.
+2. Run :
+```bash
+cd ../..
+make dynconfig
+```
+
 3. Wait about **2 minutes**: the ConfigMap takes ~1 min to reach the pods, and the namespace quota
    is recalculated lazily after that.
 4. Read the dashboard and answer the questions.
