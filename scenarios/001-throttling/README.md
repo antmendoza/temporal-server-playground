@@ -164,7 +164,49 @@ Match what you see to the limit:
 | `ConcurrentLimit` | `Namespace` | frontend | `frontend.namespaceCount` | 2 |
 | `PersistenceLimit` | `System` | the service in the persistence panel | `<service>.persistenceMaxQPS` | 3 (history), 4 (frontend) |
 
-A host-wide frontend limit such as `frontend.rps` also reports `RpsLimit`; it isn't part of this lab.
+## Other knobs to explore after the lab
 
-Other related knobs to explore after the lab: `frontend.namespaceBurstRatio`,
-`frontend.namespaceRPS.visibility`, `matching.persistenceMaxQPS`, `history.rps`, `matching.rps`.
+> **Not tested.** Each entry says what the setting limits and what we *expect* to see, based on the
+> setting's description in the server source (v1.32.2), not on a run. Try one at a time on the
+> same baseline load, and replace the expectation with what you measure.
+
+**Frontend**
+
+- `frontend.rps` (default 2400, per frontend host, all namespaces) — the host-wide twin of
+  exercise 1. Expect `frontend · RpsLimit` again, but with `scope:System` instead of `Namespace`:
+  the clearest way to see what the scope label means. Try a value below the baseline's ~590 req/s.
+- `frontend.namespaceBurstRatio` (default 2) — how far a namespace may burst above
+  `frontend.namespaceRPS` (burst = RPS × ratio). Expect no visible change under the steady
+  `make load`; set it to 1 together with exercise 1's limit and use a spiky load (e.g. omes
+  `ebb_and_flow`) to see rejections start earlier.
+- `frontend.namespaceRPS.visibility` (default 10, per frontend host) — a separate budget for
+  List/Count calls. The load doesn't make visibility calls, so drive them yourself (Temporal UI,
+  or `temporal workflow list` in a loop). Expect `RpsLimit` on `ListWorkflowExecutions` /
+  `CountWorkflowExecutions` while workflows keep running normally.
+- `frontend.globalNamespaceRPS` / `frontend.globalNamespaceCount` (default 0 = off) —
+  cluster-wide versions of exercises 1 and 2, split evenly across frontend hosts. With one frontend
+  pod they should behave like exercises 1–2; they only differ with 2+ frontend replicas.
+
+**History**
+
+- `history.rps` (default 3000, per history host) / `history.namespaceRPS` (0 = falls back to
+  `history.rps`) — incoming requests to history from frontend and matching. Expect `history ·
+  RpsLimit`, surfacing to clients through the frontend; if confirmed, add a row to the table above.
+- `history.persistenceNamespaceMaxQPS` (0 = off) / `history.persistencePerShardNamespaceMaxQPS`
+  (0 = off) — the per-namespace twins of exercise 3. Expect persistence throttling on history with
+  `scope:Namespace` instead of `System`.
+- `history.taskSchedulerMaxQPS` (0 = falls back to `history.persistenceMaxQPS`) — caps how fast
+  history runs its background tasks; needs `history.taskSchedulerEnableRateLimiter: true`
+  (default false). Expect no `RESOURCE_EXHAUSTED` at all, only History queue lag (see
+  [002-history-queues](../002-history-queues/README.md)).
+
+**Matching**
+
+- `matching.rps` (default 1200, per matching host) / `matching.namespaceRPS` (0 = falls back to
+  `matching.rps`) — incoming requests to matching (task adds from history, polls from the
+  frontend). Expect `matching · RpsLimit` on `AddWorkflowTask` / `AddActivityTask` and polls, and
+  schedule-to-start rising.
+- `matching.persistenceMaxQPS` (default 3000, per matching host) — matching's database budget.
+  The baseline uses only ~2 QPS because tasks are handed straight to waiting pollers, so expect no
+  effect until tasks go into the backlog (e.g. combined with exercise 2); then `PersistenceLimit`
+  from matching.
