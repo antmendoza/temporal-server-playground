@@ -14,39 +14,49 @@ Dashboard: **001 — Throttling Lab** (Grafana, http://localhost:3000). The top 
 
 ## Setup
 
-Keep these running in their own terminals (see the [main README](../../README.md#getting-started)):
+Keep these running in their own terminals (see the [main README](../../README.md#getting-started)).
+The worker needs enough pollers that it is never the bottleneck, so start it with 50:
 
 ```bash
+cd ../..
 make forward
-make worker
+make worker pollers=50
 ```
 
-Then start the scenario and a steady load, and leave the load running for the whole lab:
+Then start the scenario and a steady load, and leave the load running for the whole lab. Each
+workflow runs 10 activities in parallel, each taking 0.2s:
 
 ```bash
 cd ../..
 make scenario-001-throttling
-make load duration=30m rps=20 concurrent=200
+make load scenario=serverless_burst duration=60m rps=25 concurrent=50 \
+  opts="--option fast-activity-count=0 --option slow-activity-count=10 --option slow-activity-duration=200ms"
 ```
+
+`rps=25` is the highest rate this minikube cluster handles with no server contention: at 30/s
+schedule-to-start starts to grow on its own, with no limit set.
 
 ## Baseline — know what normal looks like
 
-Wait 2 minutes and read the top row. At `rps=20` on minikube you should see roughly:
+Wait 2 minutes and read the dashboard. Measured on minikube (server 1.32.2):
 
 | Signal | Baseline |
 |---|---|
-| Workflows completed | ~20/s |
+| Workflows started / completed | ~25/s |
+| Activities executed | ~250/s |
 | `RESOURCE_EXHAUSTED` | none |
-| Persistence QPS | history ~615, frontend ~60, matching ~5 |
-| Workflow task schedule-to-start p95 | ~0.02s |
+| Activity schedule-to-start p50 / p95 / p99 | ~14 / 40 / 85 ms |
+| Workflow task schedule-to-start p50 / p95 / p99 | ~10 / 50 / 180 ms |
+| Workflow end-to-end p50 / p95 | ~0.38 / 0.49 s (the 10 activities run in parallel) |
+| Frontend requests | ~590/s |
+| Persistence QPS | history ~1,280, frontend ~76, matching ~2 |
 
 ## How each exercise works
-
 
 While the load generator is running:
 
 1. Open `config/dynamicconfig/development.yaml` and uncomment **one** exercise block.
-2. Run :
+2. Run:
 ```bash
 cd ../..
 make dynconfig
@@ -54,103 +64,107 @@ make dynconfig
 
 3. Wait about **2 minutes**: the ConfigMap takes ~1 min to reach the pods, and the namespace quota
    is recalculated lazily after that.
-4. Read the dashboard and answer the questions.
+4. Read the dashboard and compare it with the expected signals.
 5. Comment the block out again, `make dynconfig`, and wait until the baseline is back before the next one.
+
+Each limit is set to about half of what the baseline uses, so it bites but doesn't stop the cluster.
 
 ---
 
 ## Exercise 1 — frontend namespace RPS
 
 ```yaml
-frontend.namespaceRPS:          # default 2400 per frontend host
-  - value: 50
+frontend.namespaceRPS:          # default 2400 per frontend host; baseline uses ~590
+  - value: 295
     constraints: {}
 ```
 
 **Expected**
-- *RESOURCE_EXHAUSTED by service · cause · operation*: `frontend · RpsLimit`, mostly on
-  `PollWorkflowExecutionHistory`, a little on `PollWorkflowTaskQueue`.
-- *Workflows completed* drops from ~20/s to ~10/s.
-- *Schedule-to-Start Latency — Workflow Tasks* rises to ~10s.
-
-**Questions**
-- The load client calls `PollWorkflowExecutionHistory` to wait for each workflow's result. Why is it
-  throttled far more than the worker's `PollWorkflowTaskQueue`? (Hint: on 1.32, poll APIs wait for
-  a rate-limit token before failing.)
-- Workflow task schedule-to-start went up, but the worker is idle. Where is the time going?
+- *RESOURCE_EXHAUSTED by service · scope · cause · operation*: `frontend · scope:Namespace ·
+  RpsLimit · PollWorkflowExecutionHistory`, ~23/s.
+- Workflows started and completed drop from ~25/s to ~12.5/s; frontend requests from ~590/s to ~320/s.
+- Schedule-to-start and workflow end-to-end latency stay at baseline.
 
 ## Exercise 2 — frontend concurrent long-polls
 
 ```yaml
 frontend.namespaceCount:        # default 1200 per frontend host, per API
-  - value: 20
+  - value: 2
     constraints: {}
 ```
 
 **Expected**
-- `frontend · ConcurrentLimit` on `PollWorkflowTaskQueue` and `PollActivityTaskQueue`.
-- *Workflows completed* stays at ~20/s and schedule-to-start stays low: **no impact**.
-
-**Questions**
-- The dashboard shows errors, yet nothing slowed down. What does that say about the worker's poller
-  count compared to what this load needs?
-- Would you page someone for this error rate? What would you check first?
+- *RESOURCE_EXHAUSTED*: `frontend · scope:Namespace · ConcurrentLimit` on `PollWorkflowTaskQueue`
+  (~8/s), `PollActivityTaskQueue` (~8/s) and `PollWorkflowExecutionHistory` (~12/s).
+- *SDK long-poll failures*: the same polls failing with `RESOURCE_EXHAUSTED` on the client side.
+- *Task queue backlog*: workflow tasks pile up (~100 waiting).
+- Workflows started drop from ~25/s to ~1/s and completions stop.
 
 ## Exercise 3 — history persistence QPS
 
 ```yaml
-history.persistenceMaxQPS:      # default 9000 per history host
-  - value: 200
+history.persistenceMaxQPS:      # default 9000 per history host; baseline uses ~1,280
+  - value: 638
     constraints: {}
 ```
 
 **Expected**
-- *Persistence calls throttled*: `history`, across many operations (including background ones like
-  `GetCurrentClusterMetadata` and task-queue range completes).
-- *RESOURCE_EXHAUSTED*: `PersistenceLimit` from `history`, and also from `matching`
-  (`AddWorkflowTask`, `PollWorkflowTaskQueue`). No `RpsLimit` on the frontend.
-- *Workflows completed* drops from ~20/s to ~3/s; schedule-to-start ~10s.
+- *Persistence calls throttled*: `history · scope:System`, across many operations, including
+  `GetWorkflowExecution`, `UpdateWorkflowExecution` and background calls like `GetCurrentClusterMetadata`.
+- *RESOURCE_EXHAUSTED*: a little `history · scope:System · PersistenceLimit` on `RecordWorkflowTaskStarted`.
+  Nothing from the frontend.
+- Workflows completed drop from ~25/s to ~12/s; workflow task schedule-to-start p99 rises to ~3s
+  and workflow end-to-end p95 to ~2.8s.
 - *Persistence latency* stays flat: calls are rejected before they reach the database.
-
-**Questions**
-- Matching reports `PersistenceLimit`, but matching's own persistence QPS is tiny. Which service is
-  the real bottleneck, and which panel proves it?
-- The database is not slow. What would you tell a customer who says "Postgres is overloaded"?
 
 ## Exercise 4 — frontend persistence QPS (revert promptly)
 
 ```yaml
-frontend.persistenceMaxQPS:     # default 2000 per frontend host
-  - value: 10
+frontend.persistenceMaxQPS:     # default 2000 per frontend host; baseline uses ~76
+  - value: 37
     constraints: {}
 ```
 
 **Expected**
-- *Persistence calls throttled*: `frontend`, mostly `GetNamespace` and `GetCurrentClusterMetadata`.
-- *RESOURCE_EXHAUSTED*: `frontend · PersistenceLimit` on `StartWorkflowExecution`.
-- *Workflows completed vs. start failures*: completions fall to 0, start failures ~20/s.
+- *Persistence calls throttled*: `frontend`, mostly `GetCurrentClusterMetadata` (~28/s).
+- *RESOURCE_EXHAUSTED*: `frontend · scope:System · PersistenceLimit` on `StartWorkflowExecution` (~26/s).
+- *Workflows completed vs. start failures*: completions fall from ~25/s to ~2.5/s; the load client
+  sees `StartWorkflowExecution` fail with `DEADLINE_EXCEEDED` (~4/s).
 
-This limit also throttles the frontend's membership heartbeat (`UpsertClusterMembership`), so don't
-leave it on longer than needed.
-
-**Questions**
-- Exercises 1 and 4 both hit the frontend. How do you tell them apart from the client side alone?
-  And from the server side?
+This limit also throttles the frontend's own background calls, so don't leave it on longer than needed.
 
 ---
 
-## Which limit is it? — the two queries
+## Reading the signals: from RESOURCE_EXHAUSTED to the limit behind it
+
+When a client gets `RESOURCE_EXHAUSTED`, two panels in the dashboard's top row tell you which limit
+rejected it:
+
+- **RESOURCE_EXHAUSTED by service · scope · cause · operation**: every call a service rejected,
+  with its cause and scope. This is where you start.
+- **Persistence calls throttled by service · scope · operation**: calls a service's own database
+  rate limiter rejected before they reached the database. When the first panel says
+  `PersistenceLimit`, this one tells you which service's limit it was.
+
+To query them yourself in Prometheus (http://localhost:9091):
 
 ```promql
+# panel: RESOURCE_EXHAUSTED by service · scope · cause · operation
 sum by (service_name, operation, resource_exhausted_cause, resource_exhausted_scope)(rate(service_errors_resource_exhausted[1m]))
+
+# panel: Persistence calls throttled by service · scope · operation
 sum by (service_name, operation, resource_exhausted_scope)(rate(persistence_errors_resource_exhausted[1m]))
 ```
 
-| Cause | Emitted by | Limit to look at |
-|---|---|---|
-| `RpsLimit` | frontend | `frontend.namespaceRPS`, `frontend.globalNamespaceRPS`, `frontend.rps` |
-| `ConcurrentLimit` | frontend | `frontend.namespaceCount` |
-| `PersistenceLimit` | the service in `persistence_errors_resource_exhausted` | `<service>.persistenceMaxQPS` |
+Match what you see to the limit:
+
+| Cause | Scope | Emitted by | Limit to look at | Exercise |
+|---|---|---|---|---|
+| `RpsLimit` | `Namespace` | frontend | `frontend.namespaceRPS` (or `frontend.globalNamespaceRPS`) | 1 |
+| `ConcurrentLimit` | `Namespace` | frontend | `frontend.namespaceCount` | 2 |
+| `PersistenceLimit` | `System` | the service in the persistence panel | `<service>.persistenceMaxQPS` | 3 (history), 4 (frontend) |
+
+A host-wide frontend limit such as `frontend.rps` also reports `RpsLimit`; it isn't part of this lab.
 
 Other related knobs to explore after the lab: `frontend.namespaceBurstRatio`,
 `frontend.namespaceRPS.visibility`, `matching.persistenceMaxQPS`, `history.rps`, `matching.rps`.

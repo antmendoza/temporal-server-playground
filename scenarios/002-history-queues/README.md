@@ -60,7 +60,7 @@ Visibility is slower than the others even when healthy: it writes to Elasticsear
 
 1. Open `config/dynamicconfig/development.yaml` and uncomment **one** exercise block.
 2. Run `make dynconfig` and wait about **2 minutes**.
-3. Read the dashboard and answer the questions.
+3. Read the dashboard and compare it with the expected signals.
 4. Comment the block out again and `make dynconfig`. The backlog takes **~5 minutes to drain**:
    wait until *Queue latency* is back to baseline before the next exercise. While it drains, the
    latency shown is the age of the old tasks finishing, so it looks worse before it looks better.
@@ -84,11 +84,6 @@ history.transferProcessorMaxPollHostRPS:
 - *Schedule latency*: Transfer stays at ~0.001s — the workers are idle, waiting for tasks.
 - *Workflow task schedule-to-start* (SDK row) climbs to ~10s; completions drop from ~60/s to ~1.5/s.
 
-**Questions**
-- Your workers are idle but schedule-to-start is 10s. Where is the Workflow Task waiting, and why
-  would adding workers not help?
-- Why do timer and visibility tasks/s also drop, even though their queues are healthy?
-
 ## Exercise 2 — the timer queue falls behind
 
 ```yaml
@@ -102,10 +97,6 @@ history.timerProcessorMaxPollHostRPS:
 - *Workflow task schedule-to-start* stays low (~0.2s): the worker looks healthy.
 - *Workflow end-to-end* rises and completions drop from ~60/s to ~2/s — 2-second timers are
   firing over a minute late.
-
-**Questions**
-- Compare with Exercise 1: both make workflows slow. Which SDK metric tells them apart?
-- Which other things ride on the timer queue and would also be late here? (Hint: timeouts, retries.)
 
 ## Exercise 3 — the visibility queue falls behind
 
@@ -127,11 +118,6 @@ history.visibilityProcessorMaxPollHostRPS:
 
 > If `temporal` dials the wrong server, prefix it with `env -u TEMPORAL_CONFIG_FILE`.
 
-**Questions**
-- A customer says "workflows are missing from the UI" but their workers see no errors. What would
-  you check first?
-- Why does a visibility backlog never slow the workflows themselves down?
-
 ## Exercise 4 — a knob that doesn't matter here
 
 ```yaml
@@ -143,10 +129,6 @@ history.transferProcessorSchedulerWorkerCount:   # default 512 per host
 **Expected**
 - *Schedule latency*: Transfer rises slightly (~0.001s → ~0.01s). Nothing else changes.
 - One worker keeps up with ~180 transfer tasks/s on this cluster.
-
-**Questions**
-- `task_latency_schedule` is the metric that would show a saturated worker pool. Why is it the
-  right one to check before raising `…SchedulerWorkerCount`?
 
 ---
 

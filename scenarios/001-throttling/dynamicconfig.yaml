@@ -11,34 +11,32 @@ system.forceSearchAttributesCacheRefreshOnRead:
   - value: true # Dev only — do not use in production
     constraints: {}
 
+# Load: serverless_burst, 10 x 0.2s activities per workflow, rps=25, concurrent=50; worker pollers=50.
+# Baseline at that load: frontend ~590 req/s; persistence QPS history ~1,280, frontend ~76.
+# Each limit is about half of the baseline usage. Measured signals are in the README.
+
 # ── Exercise 1: frontend namespace RPS (default 2400) ────────────────────────────
-# Signal: service_errors_resource_exhausted{service_name="frontend", resource_exhausted_cause="RpsLimit"}
-#   mostly on PollWorkflowExecutionHistory (the load client waiting for results); poll APIs wait
-#   for a token before failing. Throughput 20 → ~10/s, schedule-to-start p95 → ~10s.
+# Signal: frontend · Namespace · RpsLimit on PollWorkflowExecutionHistory; throughput 25 → ~12.5/s.
 #frontend.namespaceRPS:
-#  - value: 50
+#  - value: 295
 #    constraints: {}
 
 # ── Exercise 2: frontend concurrent long-polls (default 1200) ────────────────────
-# Signal: service_errors_resource_exhausted{service_name="frontend", resource_exhausted_cause="ConcurrentLimit"}
-#   on PollWorkflowTaskQueue / PollActivityTaskQueue — and NO slowdown: the worker has more pollers
-#   than it needs. Errors are not always impact.
+# Signal: frontend · Namespace · ConcurrentLimit on worker and client polls; workflow backlog grows,
+#   starts drop to ~1/s. (At 20 or 10 there are many rejections but no impact.)
 #frontend.namespaceCount:
-#  - value: 20
+#  - value: 2
 #    constraints: {}
 
 # ── Exercise 3: history persistence QPS (default 9000) ───────────────────────────
-# Signal: persistence_errors_resource_exhausted{service_name="history"}; the PersistenceLimit cause
-#   also shows downstream in matching (AddWorkflowTask, PollWorkflowTaskQueue). Frontend clean.
-#   Throughput 20 → ~3/s, schedule-to-start p95 → ~10s.
+# Signal: persistence_errors_resource_exhausted{service_name="history"} (System scope);
+#   completions 25 → ~12/s, workflow task schedule-to-start p99 ~3s.
 #history.persistenceMaxQPS:
-#  - value: 200
+#  - value: 638
 #    constraints: {}
 
 # ── Exercise 4: frontend persistence QPS (default 2000) — revert promptly ────────
-# Signal: persistence_errors_resource_exhausted{service_name="frontend"} (GetNamespace,
-#   GetCurrentClusterMetadata); every StartWorkflowExecution fails with PersistenceLimit.
-#   Throughput → 0. Also throttles the frontend's membership heartbeat (UpsertClusterMembership).
+# Signal: frontend · System · PersistenceLimit on StartWorkflowExecution; completions 25 → ~2.5/s.
 #frontend.persistenceMaxQPS:
-#  - value: 10
+#  - value: 37
 #    constraints: {}

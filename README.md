@@ -126,7 +126,7 @@ so another cluster means a new values file plus `CTX=<kube context>`.
 ```
 ├── Makefile
 ├── scenarios/<name>/
-│   ├── README.md                 ← walkthrough: setup, expected signals, questions
+│   ├── README.md                 ← walkthrough: setup, expected signals
 │   └── dynamicconfig.yaml        ← copied to config/dynamicconfig/development.yaml by make
 ├── config/dynamicconfig/
 │   └── development.yaml          ← the live config (generated, not in git); edit it for exercises, then make dynconfig

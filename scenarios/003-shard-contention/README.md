@@ -42,8 +42,3 @@ The dashboard is organized in tiers, from primary signal to secondary effects:
 | Tier 6 — Shard Topology | per-shard activity | A few shards carry all the load |
 | SDK Metrics | worker task slots | Slots **drop** — the opposite of the throttling lab, where slots stay high |
 
-## Questions
-
-- Why can't you fix this one with dynamic config while the cluster is running?
-- The worker is busy and schedule-to-start is high. How is this different from Exercise 1 of the
-  [throttling lab](../001-throttling/README.md), where schedule-to-start was also high?
