@@ -17,6 +17,7 @@ scenario ?= workflow_with_single_noop_activity
 iterations ?= 1000
 duration ?=
 concurrent ?= 50
+pollers ?=
 rps ?= 0
 opts ?=
 
@@ -85,7 +86,8 @@ $(OMES_DIR)/go.mod:
 
 worker: $(OMES_DIR)/go.mod
 	$(OMES) run-worker --language go --run-id $(run) --server-address localhost:7233 \
-		--worker-prom-listen-address 0.0.0.0:9095
+		--worker-prom-listen-address 0.0.0.0:9095 \
+		$(if $(pollers),--worker-max-concurrent-workflow-pollers $(pollers) --worker-max-concurrent-activity-pollers $(pollers))
 
 load: $(OMES_DIR)/go.mod
 	$(OMES) run-scenario --scenario $(scenario) --run-id $(run) --server-address localhost:7233 \
