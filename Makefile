@@ -25,8 +25,13 @@ opts ?=
 cluster:
 	minikube start -p $(CTX) --driver=docker --cpus=6 --memory=10g
 
+# The live config is generated (not tracked): start from the baseline when it's missing
+$(DYNCONFIG):
+	@mkdir -p $(dir $@)
+	cp $(SCENARIOS)/000-base/dynamicconfig.yaml $@
+
 # Deletes the whole namespace (Temporal, its DBs, Prometheus, Grafana) and installs it from scratch
-up:
+up: $(DYNCONFIG)
 	make down
 	kubectl --context $(CTX) create namespace $(NS)
 	$(HELM) install deps k8s/deps --wait --timeout 10m
@@ -56,7 +61,7 @@ reset:
 	make up
 
 # Push development.yaml to the running server without a reinstall; pods see it in ~1 min
-dynconfig:
+dynconfig: $(DYNCONFIG)
 	$(KUBECTL) create configmap temporal-dynamic-config --from-file=dynamic_config.yaml=$(DYNCONFIG) \
 		--dry-run=client -o yaml | $(KUBECTL) apply -f -
 

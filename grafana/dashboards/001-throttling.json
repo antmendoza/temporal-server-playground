@@ -1112,7 +1112,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum(rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket{namespace=~\"$namespace\",task_queue=~\"$task_queue\"}[$__rate_interval])) by (task_queue, le))",
+          "expr": "histogram_quantile($percentile, sum(rate(temporal_workflow_task_schedule_to_start_latency_bucket{namespace=~\"$namespace\",task_queue=~\"$task_queue\"}[$__rate_interval])) by (task_queue, le))",
           "legendFormat": "{{task_queue}}",
           "range": true,
           "refId": "A"
@@ -1213,7 +1213,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum(rate(temporal_activity_schedule_to_start_latency_seconds_bucket{namespace=~\"$namespace\",task_queue=~\"$task_queue\"}[$__rate_interval])) by (task_queue, le))",
+          "expr": "histogram_quantile($percentile, sum(rate(temporal_activity_schedule_to_start_latency_bucket{namespace=~\"$namespace\",task_queue=~\"$task_queue\"}[$__rate_interval])) by (task_queue, le))",
           "legendFormat": "{{task_queue}}",
           "range": true,
           "refId": "A"

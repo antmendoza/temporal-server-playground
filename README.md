@@ -101,6 +101,21 @@ make load scenario=throughput_stress concurrent=100 rps=50 opts="--option nexus-
 `cd omes && go run ./cmd/omes list-scenarios` lists the omes scenarios.
 Prometheus scrapes the worker (:9095) and the load client (:9096) as job `temporal-sdk`.
 
+## Dashboards
+
+All dashboards live in `grafana/dashboards/` and are loaded into Grafana as a ConfigMap
+(`make dashboards` reloads them into a running cluster).
+
+- **`000-*` — general dashboards from
+  [temporal-server-operations](https://github.com/tsurdilo/temporal-server-operations/tree/main/observability/dashboards)'
+  repo, used unchanged:** `000-temporal-server.json` (Temporal Server Dashboard v2.35.0) and
+  `000-temporal-sdk-go.json` (Temporal Go SDK Dashboard v1.5.0). Their panel references and
+  changelogs are in that repo. To update, download the newer JSON over these files.
+- **`001-*`, `002-*`, `003-*` — one per scenario**, built for this playground.
+
+The [baseline README](scenarios/000-base/README.md#dashboards) explains what the `000-*`
+dashboards cover and which of their panels stay empty on this cluster.
+
 ## Other environments
 
 Environment-specific settings live in `k8s/values/temporal-<ENV>.yaml` (`ENV=minikube` by default),
@@ -114,7 +129,7 @@ so another cluster means a new values file plus `CTX=<kube context>`.
 │   ├── README.md                 ← walkthrough: setup, expected signals, questions
 │   └── dynamicconfig.yaml        ← copied to config/dynamicconfig/development.yaml by make
 ├── config/dynamicconfig/
-│   └── development.yaml          ← the live config; edit it for exercises, then make dynconfig
+│   └── development.yaml          ← the live config (generated, not in git); edit it for exercises, then make dynconfig
 ├── k8s/
 │   ├── deps/                     ← local chart: PostgreSQL + Elasticsearch (minikube only)
 │   └── values/                   ← Helm values: temporal(-<env>), prometheus, grafana
@@ -122,3 +137,17 @@ so another cluster means a new values file plus `CTX=<kube context>`.
 ├── omes/                         ← load generator (git submodule, pinned)
 └── scripts/port-forward.sh
 ```
+
+## TODO
+
+- [ ] Link the matching playbook from
+  [temporal-server-operations/playbooks](https://github.com/tsurdilo/temporal-server-operations/tree/main/playbooks)
+  in each scenario README, as background reading:
+  - `001-throttling` → `history-persistence-qps-limits.md`
+  - `002-history-queues` → `history-task-processing-tuning.md`
+  - `003-shard-contention` → `shard-io-concurrency.md`, `hot-shard-detection-remediation.md`
+  - `000-base` (Resting Load) → `idle-cluster-resource-utilization.md`
+- [ ] Evaluate [temporal-helm-superchart](https://github.com/tsurdilo/temporal-helm-superchart) as
+  the base instead of `k8s/`: the official chart as a subchart plus Postgres, Prometheus/Grafana,
+  Loki, MinIO, live-reload dynamic config and 2× frontend/history/matching (needed for the planned
+  shard-handoff scenario). Trade-offs: heavier stack, targets Docker Desktop Kubernetes, not minikube.

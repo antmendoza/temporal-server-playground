@@ -380,7 +380,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by (le)(rate(temporal_workflow_task_schedule_to_start_latency_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile($percentile, sum by (le)(rate(temporal_workflow_task_schedule_to_start_latency_bucket[$__rate_interval])))",
           "legendFormat": "WFT schedule-to-start",
           "range": true,
           "refId": "A"
@@ -432,7 +432,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile($percentile, sum by (le)(rate(temporal_workflow_endtoend_latency_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile($percentile, sum by (le)(rate(temporal_workflow_endtoend_latency_bucket[$__rate_interval])))",
           "legendFormat": "end-to-end",
           "range": true,
           "refId": "A"
