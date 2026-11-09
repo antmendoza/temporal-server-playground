@@ -2,9 +2,11 @@
 
 Temporal has several independent limits that protect the cluster. When any of them trips, the client
 sees the same error: `RESOURCE_EXHAUSTED`. In this lab you trip four of them, one at a time, and
-learn to tell them apart from two labels on the server metrics:
+learn to tell them apart from three labels on the server metrics:
 
 - `resource_exhausted_cause` — **which kind** of limit: `RpsLimit`, `ConcurrentLimit`, `PersistenceLimit`
+- `resource_exhausted_scope` — **how wide** the limit is: `Namespace` (a per-namespace limit, such
+  as `frontend.namespaceRPS`) or `System` (a host- or cluster-wide limit, such as `frontend.rps`)
 - `service_name` — **which service** rejected the call: frontend, history, matching
 
 Dashboard: **001 — Throttling Lab** (Grafana, http://localhost:3000). The top row,
@@ -140,8 +142,8 @@ leave it on longer than needed.
 ## Which limit is it? — the two queries
 
 ```promql
-sum by (service_name, operation, resource_exhausted_cause)(rate(service_errors_resource_exhausted[1m]))
-sum by (service_name, operation)(rate(persistence_errors_resource_exhausted[1m]))
+sum by (service_name, operation, resource_exhausted_cause, resource_exhausted_scope)(rate(service_errors_resource_exhausted[1m]))
+sum by (service_name, operation, resource_exhausted_scope)(rate(persistence_errors_resource_exhausted[1m]))
 ```
 
 | Cause | Emitted by | Limit to look at |

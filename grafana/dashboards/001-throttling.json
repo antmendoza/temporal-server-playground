@@ -37,8 +37,8 @@
     {
       "id": 19,
       "type": "timeseries",
-      "title": "RESOURCE_EXHAUSTED by service · cause · operation",
-      "description": "Server-side rejections. Cause tells the limit: RpsLimit (ex. 1), ConcurrentLimit (ex. 2), PersistenceLimit (ex. 3, 4). service_name tells who rejected — a PersistenceLimit in matching can originate in history.",
+      "title": "RESOURCE_EXHAUSTED by service · scope · cause · operation",
+      "description": "Server-side rejections. Cause tells the limit: RpsLimit (ex. 1), ConcurrentLimit (ex. 2), PersistenceLimit (ex. 3, 4). service_name tells who rejected — a PersistenceLimit in matching can originate in history. resource_exhausted_scope tells how wide the limit is: Namespace = a per-namespace limit (e.g. frontend.namespaceRPS), System = a host- or cluster-wide limit (e.g. frontend.rps).",
       "datasource": {
         "type": "prometheus",
         "uid": "$datasource"
@@ -56,8 +56,8 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "sum by (service_name, resource_exhausted_cause, operation)(rate(service_errors_resource_exhausted[$__rate_interval]))",
-          "legendFormat": "{{service_name}} · {{resource_exhausted_cause}} · {{operation}}",
+          "expr": "sum by (service_name, resource_exhausted_cause, operation, resource_exhausted_scope)(rate(service_errors_resource_exhausted[$__rate_interval]))",
+          "legendFormat": "{{service_name}} · scope:{{resource_exhausted_scope}} · {{resource_exhausted_cause}} · {{operation}}",
           "range": true,
           "refId": "A"
         }
@@ -92,8 +92,8 @@
     {
       "id": 20,
       "type": "timeseries",
-      "title": "Persistence calls throttled by service · operation",
-      "description": "The service's own DB rate limiter (<service>.persistenceMaxQPS) rejecting calls before they reach the database. The service listed here is the root of a PersistenceLimit.",
+      "title": "Persistence calls throttled by service · scope · operation",
+      "description": "The service's own DB rate limiter (<service>.persistenceMaxQPS) rejecting calls before they reach the database. The service listed here is the root of a PersistenceLimit. Scope: System = <service>.persistenceMaxQPS / persistenceGlobalMaxQPS, Namespace = <service>.persistenceNamespaceMaxQPS.",
       "datasource": {
         "type": "prometheus",
         "uid": "$datasource"
@@ -111,8 +111,8 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "sum by (service_name, operation)(rate(persistence_errors_resource_exhausted[$__rate_interval]))",
-          "legendFormat": "{{service_name}} · {{operation}}",
+          "expr": "sum by (service_name, operation, resource_exhausted_scope)(rate(persistence_errors_resource_exhausted[$__rate_interval]))",
+          "legendFormat": "{{service_name}} · scope:{{resource_exhausted_scope}} · {{operation}}",
           "range": true,
           "refId": "A"
         }
