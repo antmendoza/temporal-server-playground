@@ -73,6 +73,7 @@ dashboards:
 	$(KUBECTL) rollout restart deploy/grafana
 
 scenario-%:
+	@mkdir -p $(dir $(DYNCONFIG))
 	cp $(SCENARIOS)/$*/dynamicconfig.yaml $(DYNCONFIG)
 	@echo "→ $*: reinstalling (NUM_HISTORY_SHARDS=$(shards))"
 	make up
